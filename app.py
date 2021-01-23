@@ -21,7 +21,7 @@ def getData():
     #read in
     towns = pd.read_csv(r'https://raw.githubusercontent.com/BenDavis71/ImGonnaCroot500Miles/master/towns.csv') 
     teams = pd.read_csv('https://raw.githubusercontent.com/BenDavis71/ImGonnaCroot500Miles/master/teams-lat-long.csv', index_col='school')
-    recruits = towns[['city','position','lat_x','lng_x','count']].groupby(['city','position','lat_x','lng_x'], as_index=False).max()
+    recruits = towns[['city','position','year','lat_x','lng_x','count']].groupby(['city','position','year','lat_x','lng_x'], as_index=False).max()
     #force the logo string to behave as a list
     teams['logos'] = teams['logos'].apply(lambda x: eval(x))
 
