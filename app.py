@@ -16,12 +16,16 @@ st.markdown('_Data courtesy of @CFB_Data_')
 
 #read-in data that was collected from collegefootballdata.com
 #cache this function so that streamlit doesn't rerun it everytime a user input is changed
-
+@st.cache(allow_output_mutation=True)
 def getData():
     #read in
     towns = pd.read_csv(r'https://raw.githubusercontent.com/BenDavis71/ImGonnaCroot500Miles/master/towns.csv') 
     teams = pd.read_csv('https://raw.githubusercontent.com/BenDavis71/ImGonnaCroot500Miles/master/teams-lat-long.csv', index_col='school')
-    recruits = towns[['city','position','year','lat_x','lng_x','count']].groupby(['city','position','year','lat_x','lng_x'], as_index=False).max()
+    
+    #create recruits df by modifying towns
+    recruits = towns[['city','position','year','lat_x','lng_x','count']].groupby(['city','position','year','lat_x','lng_x'], as_index=False).sum()
+    recruits['count'] = (recruits['count']  / 132).astype(int)
+    
     #force the logo string to behave as a list
     teams['logos'] = teams['logos'].apply(lambda x: eval(x))
 
@@ -36,7 +40,7 @@ towns, recruits, teams, teamsList = getData()
 years = st.slider("Date Range", min_value=2015, max_value=2020, value=(2015, 2020))
 
 #user input for distance
-distance = st.slider("Distance", min_value=0, max_value=500, value=250, step=50)
+distance = st.slider("Distance", min_value=0, max_value=500, value=250, step=25)
 
 #user input for recruit type
 positionFilter = st.radio('Position Filter', ['All Recruits', 'By Position'])
@@ -47,7 +51,7 @@ if positionFilter == 'By Position':
 
 
 #user input for team
-schools = st.multiselect("Team", teamsList, default = ['USC','BYU','Texas','UCF', 'Virginia Tech'])
+schools = st.multiselect("Team", teamsList, default = ['Stanford','Colorado','Texas','Alabama', 'Virginia Tech'])
 
 
 
@@ -55,14 +59,20 @@ schools = st.multiselect("Team", teamsList, default = ['USC','BYU','Texas','UCF'
 
 #filter towns dataframe to match user selections
 towns = towns[(towns['school'].isin(schools)) & (towns['distance'] <= distance)]
-
 towns = towns[towns['year'].between(years[0],years[1])]
+
+
+
+#filter positions by user selections
+positionString = 'Recruits'
 
 if positionFilter == 'By Position':
     recruits = recruits[recruits['position'].isin(positions)]
     towns = towns[towns['position'].isin(positions)]
+    positionString = f"{', '.join(positions)} Recruits"
 
 
+#groupbys to reduce dataframe size
 recruits = recruits[['city','lat_x','lng_x','count']].groupby(['city','lat_x','lng_x'], as_index=False).sum()
 towns = towns[['city','lat_x','lng_x','count','school','lat_y','lng_y','distance']].groupby(['city','lat_x','lng_x','school','lat_y','lng_y','distance'], as_index=False).sum()
 
@@ -81,7 +91,8 @@ for i in range(len(towns)):
             lat = [towns['lat_x'][i], towns['lat_y'][i]],
             mode = 'lines',
             line = dict(width = 1.5,color = teams.loc[school]['color']),
-            opacity = .1,
+            #opacity = .1,
+            opacity = .15+ (towns['count'][i] * .01 /132),
             hoverinfo = None,
         )
     )
@@ -109,7 +120,7 @@ fig.add_trace(go.Scattergeo(
 
 #title
 fig.update_layout(
-    title_text = f'Blue Chip Recruits within {distance} Miles of Campus',
+    title_text = f'Blue Chip {positionString} within {distance} Miles of Campus',
     showlegend = False,
     geo = go.layout.Geo(
         scope = 'usa',   
@@ -127,10 +138,8 @@ fig.update_layout(
 )
 
 
-#add logos
+#add school info and logos
 i = 0
-
-
 
 for school in schools:
     
@@ -157,7 +166,6 @@ for school in schools:
         )))
 
     #logos
-    
     logo = teams.loc[school]['logos'][0]
     
     fig.add_layout_image(
@@ -170,9 +178,25 @@ for school in schools:
         )
     )
     
+    #reruit counts annotations
+    fig.add_annotation(
+            text=count.astype(str),
+            xref="paper", yref="paper",
+            x= 1-((len(schools) - 1) * .1 + (.5 - (i * .2))) , y= -.03,
+            showarrow = False,
+            xanchor="center", yanchor="bottom",
+            font=dict(
+                family="Arial",
+                size=24,
+            )
+        )
+    
     i+=1
+    
+
+    
 st.write(fig)
 
 st.markdown('___')
 st.markdown('Created by [Ben Davis](https://github.com/BenDavis71/)')
-st.markdown('credit csv people')
+st.markdown('Map data thanks to [SimpleMaps](https://simplemaps.com/data/us-cities)')
