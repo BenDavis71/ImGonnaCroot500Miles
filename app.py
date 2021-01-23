@@ -118,9 +118,15 @@ fig.add_trace(go.Scattergeo(
 
 
 
-#title
+#title and map layout
 fig.update_layout(
     title_text = f'Blue Chip {positionString} within {distance} Miles of Campus',
+    title_x=0.5,
+    title_y=.75,
+    font=dict(
+        family='Arial',
+        size=20,
+    ),
     showlegend = False,
     geo = go.layout.Geo(
         scope = 'usa',   
@@ -129,16 +135,25 @@ fig.update_layout(
 
     ),
     height=700,
-    title_x=0.5,
-    title_y=.75,
-    font=dict(
-        family='Arial',
-        size=20,
-    )
+ 
 )
 
 
-#add school info and logos
+#subtitle
+fig.add_annotation(
+        text= str(years[0]) + ' - ' + str(years[1]),
+        xref="paper", yref="paper",
+        x= .5, y= .75,
+        showarrow = False,
+        xanchor="center", yanchor="bottom",
+        font=dict(
+            family="Arial",
+            size=20,
+        )
+    )
+
+
+#add school info and logos with for loop
 i = 0
 
 for school in schools:
@@ -180,16 +195,16 @@ for school in schools:
     
     #reruit counts annotations
     fig.add_annotation(
-            text=count.astype(str),
-            xref="paper", yref="paper",
-            x= 1-((len(schools) - 1) * .1 + (.5 - (i * .2))) , y= -.03,
-            showarrow = False,
-            xanchor="center", yanchor="bottom",
-            font=dict(
-                family="Arial",
-                size=24,
-            )
+        text=count.astype(str),
+        xref="paper", yref="paper",
+        x= 1-((len(schools) - 1) * .1 + (.5 - (i * .2))) , y= -.03,
+        showarrow = False,
+        xanchor="center", yanchor="bottom",
+        font=dict(
+            family="Arial",
+            size=24,
         )
+    )
     
     i+=1
     
@@ -199,4 +214,4 @@ st.write(fig)
 
 st.markdown('___')
 st.markdown('Created by [Ben Davis](https://github.com/BenDavis71/)')
-st.markdown('Map data thanks to [SimpleMaps](https://simplemaps.com/data/us-cities)')
+st.markdown('Map data from [SimpleMaps](https://simplemaps.com/data/us-cities)')
