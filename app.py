@@ -63,7 +63,7 @@ if positionFilter == 'By Position':
     towns = towns[towns['position'].isin(positions)]
 
 
-recruits = recruits[['city','lat_x','lng_x','count']].groupby(['city','lat_x','lng_x'], as_index=False).max()
+recruits = recruits[['city','lat_x','lng_x','count']].groupby(['city','lat_x','lng_x'], as_index=False).sum()
 towns = towns[['city','lat_x','lng_x','count','school','lat_y','lng_y','distance']].groupby(['city','lat_x','lng_x','school','lat_y','lng_y','distance'], as_index=False).sum()
 
 
