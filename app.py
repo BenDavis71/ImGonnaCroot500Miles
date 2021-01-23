@@ -63,7 +63,7 @@ if positionFilter == 'By Position':
     towns = towns[towns['position'].isin(positions)]
 
 
-recruits = recruits[['city','lat_x','lng_x','count']].groupby(['city','lat_x','lng_x'], as_index=False).sum()
+recruits = recruits[['city','lat_x','lng_x','count']].groupby(['city','lat_x','lng_x'], as_index=False).max()
 towns = towns[['city','lat_x','lng_x','count','school','lat_y','lng_y','distance']].groupby(['city','lat_x','lng_x','school','lat_y','lng_y','distance'], as_index=False).sum()
 
 
@@ -119,7 +119,7 @@ fig.update_layout(
     ),
     height=700,
     title_x=0.5,
-    title_y=.85,
+    title_y=.75,
     font=dict(
         family='Arial',
         size=20,
@@ -163,7 +163,7 @@ for school in schools:
         dict(
             source=logo,
             xref="paper", yref="paper",
-            x= 1-((len(schools) - 1) * .07 + (.5 - (i * .14))) , y= -.12,
+            x= 1-((len(schools) - 1) * .1 + (.5 - (i * .2))) , y= .02,
             sizex=0.2, sizey=0.2,
             xanchor="center", yanchor="bottom"
         )
