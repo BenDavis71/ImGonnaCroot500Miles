@@ -36,7 +36,7 @@ towns, recruits, teams, teamsList = getData()
 years = st.slider("Date Range", min_value=2015, max_value=2020, value=(2015, 2020))
 
 #user input for distance
-distance = st.slider("Distance", min_value=50, max_value=500, value=250)
+distance = st.slider("Distance", min_value=0, max_value=500, value=250, step=50)
 
 #user input for recruit type
 positionFilter = st.radio('Position Filter', ['All Recruits', 'By Position'])
@@ -96,9 +96,9 @@ fig.add_trace(go.Scattergeo(
     text = recruits['city'] + " - " + recruits['count'].astype(str),
     mode = 'markers',
     marker = dict(
-        size = 3,
+        size = 2 + (recruits['count'] * .15),
         color = 'rgb(55, 0, 233)',
-        opacity = .2,
+        opacity = .2+ (recruits['count'] * .01),
         line = dict(
             width = 2,
             color = 'rgba(68, 68, 68, 0)'
@@ -134,6 +134,7 @@ i = 0
 
 for school in schools:
     
+    count = towns[towns['school']==school]['count'].sum()
     
     #school
     color = [teams.loc[school]['color']]
@@ -143,7 +144,7 @@ for school in schools:
         lon = [teams.loc[school]['lng']],
         lat = [teams.loc[school]['lat']],
         hoverinfo = 'text',
-        text =  school,
+        text =  school + ' - ' + count.astype(str),
         mode = 'markers',
         marker = dict(
             size = 6,
