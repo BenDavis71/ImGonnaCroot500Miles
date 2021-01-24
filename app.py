@@ -6,11 +6,13 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+from math import radians, degrees, sin, cos, asin, acos, sqrt
 
 
 
 
-st.title('College Football Blue Chip Distance')
+
+st.title('College Football Recruiting Territories')
 st.markdown('_Data courtesy of @CFB_Data_')
 
 
@@ -19,25 +21,31 @@ st.markdown('_Data courtesy of @CFB_Data_')
 @st.cache(allow_output_mutation=True)
 def getData():
     #read in
-    towns = pd.read_csv(r'https://raw.githubusercontent.com/BenDavis71/ImGonnaCroot500Miles/master/towns.csv') 
-    teams = pd.read_csv('https://raw.githubusercontent.com/BenDavis71/ImGonnaCroot500Miles/master/teams-lat-long.csv', index_col='school')
-    
-    #create recruits df by modifying towns
-    recruits = towns[['city','position','year','lat_x','lng_x','count']].groupby(['city','position','year','lat_x','lng_x'], as_index=False).sum()
-    recruits['count'] = (recruits['count']  / 132).astype(int)
+    recruits = pd.read_csv(r'https://raw.githubusercontent.com/BenDavis71/ImGonnaCroot500Miles/master/recruits-lat-long.csv') 
+    teams = pd.read_csv('https://raw.githubusercontent.com/BenDavis71/ImGonnaCroot500Miles/master/teams-lat-long.csv')#, index_col='school')
     
     #force the logo string to behave as a list
     teams['logos'] = teams['logos'].apply(lambda x: eval(x))
 
     #generate list of teams from dataframe
-    teamsList = teams.index.tolist()
-    return towns, recruits, teams, teamsList 
+    teamsList = teams['school'].tolist()
+    return recruits, teams, teamsList 
 
 
-towns, recruits, teams, teamsList = getData()
+def great_circle(lon1, lat1, lon2, lat2):
+    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
+    return 3958.756 * (
+        acos(sin(lat1) * sin(lat2) + cos(lat1) * cos(lat2) * cos(lon1 - lon2))
+    )
+
+
+recruits, teams, teamsList = getData()
 
 #user input for date range
-years = st.slider("Date Range", min_value=2015, max_value=2020, value=(2015, 2020))
+years = st.slider("Date Range", min_value=2010, max_value=2020, value=(2015, 2020))
+
+#user input for stars
+stars = st.slider("Stars", min_value=1, max_value=5, value=(4, 5))
 
 #user input for distance
 distance = st.slider("Distance", min_value=0, max_value=500, value=250, step=25)
@@ -51,30 +59,56 @@ if positionFilter == 'By Position':
 
 
 #user input for team
-schools = st.multiselect("Team", teamsList, default = ['Stanford','Colorado','Texas','Alabama', 'Virginia Tech'])
+schools = st.multiselect("Team", teamsList, default = ['USC','Nebraska','Texas','Alabama', 'Ohio State'])
 
 
-
-
-
-#filter towns dataframe to match user selections
-towns = towns[(towns['school'].isin(schools)) & (towns['distance'] <= distance)]
-towns = towns[towns['year'].between(years[0],years[1])]
-
-
+#filter recruits dataframe to match user selections
+recruits = recruits[recruits['year'].between(years[0],years[1])]
+recruits = recruits[recruits['stars'].between(stars[0],stars[1])]
 
 #filter positions by user selections
 positionString = 'Recruits'
 
 if positionFilter == 'By Position':
     recruits = recruits[recruits['position'].isin(positions)]
-    towns = towns[towns['position'].isin(positions)]
     positionString = f"{', '.join(positions)} Recruits"
 
 
 #groupbys to reduce dataframe size
-recruits = recruits[['city','lat_x','lng_x','count']].groupby(['city','lat_x','lng_x'], as_index=False).sum()
-towns = towns[['city','lat_x','lng_x','count','school','lat_y','lng_y','distance']].groupby(['city','lat_x','lng_x','school','lat_y','lng_y','distance'], as_index=False).sum()
+
+teams = teams[teams['school'].isin(schools)]
+
+recruits['merge'] = 1
+teams['merge'] = 1
+towns = pd.merge(recruits,teams,on='merge')
+
+distanceString =  ''
+if len(schools) > 0:
+    towns['distance'] = towns.apply(lambda row: great_circle(row['lng_x'], row['lat_x'], row['lng_y'], row['lat_y']), axis = 1)
+    towns = towns[towns['distance'] <= distance]
+    distanceString =  f' within {distance} Miles of Campus'
+else:
+    towns = towns[:2]
+    distanceString
+    #convert user inputs to sets & strings (accounting for potential of single year selections)
+
+
+teams = teams.set_index('school')
+
+
+commits = []
+available = []
+
+for school in schools:
+    commits.append(towns[(towns['committedTo']==school) & (towns['school']==school)]['count'].sum())
+    available.append(towns[towns['school']==school]['count'].sum())
+
+try:
+    towns = towns[['city','lat_x','lng_x','count','school','lat_y','lng_y','distance']].groupby(['city','lat_x','lng_x','school','lat_y','lng_y','distance'], as_index=False).sum()
+except:
+    towns = towns[['city','lat_x','lng_x','count','school','lat_y','lng_y']].groupby(['city','lat_x','lng_x','school','lat_y','lng_y',], as_index=False).sum()
+recruits = recruits[['city','lat','lng','count']].groupby(['city','lat','lng'], as_index=False).sum()
+
 
 
 
@@ -91,8 +125,8 @@ for i in range(len(towns)):
             lat = [towns['lat_x'][i], towns['lat_y'][i]],
             mode = 'lines',
             line = dict(width = 1.5,color = teams.loc[school]['color']),
-            #opacity = .1,
-            opacity = .15+ (towns['count'][i] * .01 /132),
+            opacity = .11,
+            #opacity = .15+ (towns['count'][i] * .01 /132),
             hoverinfo = None,
         )
     )
@@ -101,15 +135,15 @@ for i in range(len(towns)):
 #recruits
 fig.add_trace(go.Scattergeo(
     locationmode = 'USA-states',
-    lon = recruits['lng_x'],
-    lat = recruits['lat_x'],
+    lon = recruits['lng'],
+    lat = recruits['lat'],
     hoverinfo = 'text',
     text = recruits['city'] + " - " + recruits['count'].astype(str),
     mode = 'markers',
     marker = dict(
-        size = 2 + (recruits['count'] * .15),
+        size = 2 + (recruits['count'] * .075),
         color = 'rgb(55, 0, 233)',
-        opacity = .2+ (recruits['count'] * .01),
+        opacity = .2,#.2+ (recruits['count'] * .01),
         line = dict(
             width = 2,
             color = 'rgba(68, 68, 68, 0)'
@@ -118,11 +152,25 @@ fig.add_trace(go.Scattergeo(
 
 
 
+years = sorted(set(years))
+yearString = " - ".join(str(x) for x in years)
+
+
+if (stars[0] == 1) & (stars[1] == 5):
+    starString = ''
+elif (stars[0] == 4) & (stars[1] == 5):
+    starString = 'Blue Chip '
+else:
+    stars = sorted(set(stars))
+    starString = f"{' - '.join(str(x) for x in stars)} Star "
+
+
+
 #title and map layout
 fig.update_layout(
-    title_text = f'Blue Chip {positionString} within {distance} Miles of Campus',
+    title_text = f'{starString}{positionString}{distanceString}',
     title_x=0.5,
-    title_y=.75,
+    title_y=.76,
     font=dict(
         family='Arial',
         size=20,
@@ -141,9 +189,9 @@ fig.update_layout(
 
 #subtitle
 fig.add_annotation(
-        text= str(years[0]) + ' - ' + str(years[1]),
+        text= yearString,
         xref="paper", yref="paper",
-        x= .5, y= .75,
+        x= .49, y= .77,
         showarrow = False,
         xanchor="center", yanchor="bottom",
         font=dict(
@@ -156,19 +204,21 @@ fig.add_annotation(
 #add school info and logos with for loop
 i = 0
 
+
 for school in schools:
-    
-    count = towns[towns['school']==school]['count'].sum()
-    
     #school
     color = [teams.loc[school]['color']]
+    
+    x = 1-((len(schools) - 1) * .112 + (.5 - (i * .224)))
+    if len(schools) >= 7:
+        x = 1-((len(schools) - 1) * .09 + (.5 - (i * .18)))
     
     fig.add_trace(go.Scattergeo(
         locationmode = 'USA-states',
         lon = [teams.loc[school]['lng']],
         lat = [teams.loc[school]['lat']],
         hoverinfo = 'text',
-        text =  school + ' - ' + count.astype(str),
+        text =  school + ' - ' + str(available[i]),
         mode = 'markers',
         marker = dict(
             size = 6,
@@ -187,7 +237,7 @@ for school in schools:
         dict(
             source=logo,
             xref="paper", yref="paper",
-            x= 1-((len(schools) - 1) * .1 + (.5 - (i * .2))) , y= .02,
+            x= x , y= .02,
             sizex=0.2, sizey=0.2,
             xanchor="center", yanchor="bottom"
         )
@@ -195,9 +245,9 @@ for school in schools:
     
     #reruit counts annotations
     fig.add_annotation(
-        text=count.astype(str),
+        text= str(commits[i]) + "/" + str(available[i]),
         xref="paper", yref="paper",
-        x= 1-((len(schools) - 1) * .1 + (.5 - (i * .2))) , y= -.03,
+        x= x , y= -.03,
         showarrow = False,
         xanchor="center", yanchor="bottom",
         font=dict(
@@ -206,9 +256,22 @@ for school in schools:
         )
     )
     
-    i+=1
-    
 
+    #add something that measures len difference between CMT # and AVBL and adjusts
+    fig.add_annotation(
+        text="<b>CMT / AVBL</b>",
+        xref="paper", yref="paper",
+        x= .005 + x, y= -.06,
+        showarrow = False,
+        xanchor="center", yanchor="bottom",
+        font=dict(
+            family="Arial",
+            size=12,
+        )
+    )
+    
+    
+    i+=1
     
 st.write(fig)
 
