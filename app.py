@@ -19,7 +19,7 @@ st.markdown('_Data courtesy of @CFB_Data_')
 
 #read-in data that was collected from collegefootballdata.com
 #cache this function so that streamlit doesn't rerun it everytime a user input is changed
-@st.cache(allow_output_mutation=True)
+st.cache(allow_output_mutation=True)
 def getData():
     #read in
     recruits = pd.read_csv(r'https://raw.githubusercontent.com/BenDavis71/ImGonnaCroot500Miles/master/recruits-lat-long.csv') 
@@ -41,14 +41,14 @@ def great_circle(lon1, lat1, lon2, lat2):
     
 
 #download csv function from https://discuss.streamlit.io/t/how-to-download-file-in-streamlit/1806
-def get_table_download_link(df, school, starsString, yearString):
+def get_table_download_link(df, titleString):
     """Generates a link allowing the data in a given panda dataframe to be downloaded
     in:  dataframe
     out: href string
     """
     csv = df.to_csv(index=False)
     b64 = base64.b64encode(csv.encode()).decode()  # some strings <-> bytes conversions necessary here
-    href = f'<a href="data:file/csv;base64,{b64}" download="{school} {starString}Recruits {yearString}.csv">Download {school} {starsString}Recruiting {yearString} as CSV</a>'
+    href = f'<a href="data:file/csv;base64,{b64}" download="{titleString}.csv">Download {titleString} as CSV</a>'
     return href
 
 
@@ -61,7 +61,7 @@ years = st.slider("Date Range", min_value=2010, max_value=2020, value=(2015, 202
 stars = st.slider("Stars", min_value=1, max_value=5, value=(4, 5))
 
 #user input for distance
-distance = st.slider("Distance in Miles", min_value=0, max_value=500, value=250, step=25)
+distance = st.slider("Distance in Miles", min_value=0, max_value=1000, value=250, step=25)
 
 #user input for recruit type
 positionFilter = st.radio('Position Filter', ['All Recruits', 'By Position'])
@@ -69,6 +69,10 @@ positionFilter = st.radio('Position Filter', ['All Recruits', 'By Position'])
 #user inputs for position
 if positionFilter == 'By Position':
     positions = st.multiselect('Position Select', ['QB', 'RB','WR', 'TE', 'OL', 'DT', 'DE', 'LB', 'CB', 'S', 'ATH'], default = ['QB'])
+
+
+#user input for mapping
+connectionFilter = st.radio('Connection Filter', [f'All Recruits Within {str(distance)} Miles', 'Commits Only'])
 
 
 #user input for team
@@ -80,11 +84,11 @@ recruits = recruits[recruits['year'].between(years[0],years[1])]
 recruits = recruits[recruits['stars'].between(stars[0],stars[1])]
 
 #filter positions by user selections
-positionString = 'Recruits'
+positionString = ''
 
 if positionFilter == 'By Position':
     recruits = recruits[recruits['position'].isin(positions)]
-    positionString = f"{', '.join(positions)} Recruits"
+    positionString = f" {', '.join(positions)}"
 
 #save recruits and teams df's current state for later displayTable
 recruitsTable = recruits.copy(deep = True)
@@ -109,15 +113,17 @@ if len(schools) > 0:
 else:
     towns = towns[:2]
     distanceString
-    #convert user inputs to sets & strings (accounting for potential of single year selections)
-
+    
+    
 #save towns df's current state for later displayTable
 townsTable = towns.copy(deep = True)
 
 
+#set teams as index to make .locs easier
 teams = teams.set_index('school')
 
 
+#create and populate lists describing the number of commitss
 commits = []
 available = []
 
@@ -125,12 +131,21 @@ for school in schools:
     commits.append(towns[(towns['committedTo']==school) & (towns['school']==school)]['count'].sum())
     available.append(towns[towns['school']==school]['count'].sum())
 
+
+#filter lines plotted based on connectionFilter
+recruitString = 'Recruits'
+if connectionFilter == 'Commits Only':
+    towns = towns[towns['committedTo'] == towns['school']]
+    recruitString = 'Commits'
+
+
+
+#groupbys to reduce number of .applys called later
 try:
     towns = towns[['city','lat_x','lng_x','count','school','lat_y','lng_y','distance']].groupby(['city','lat_x','lng_x','school','lat_y','lng_y','distance'], as_index=False).sum()
 except:
     towns = towns[['city','lat_x','lng_x','count','school','lat_y','lng_y']].groupby(['city','lat_x','lng_x','school','lat_y','lng_y',], as_index=False).sum()
 recruits = recruits[['city','lat','lng','count']].groupby(['city','lat','lng'], as_index=False).sum()
-
 
 
 
@@ -147,7 +162,7 @@ for i in range(len(towns)):
             lat = [towns['lat_x'][i], towns['lat_y'][i]],
             mode = 'lines',
             line = dict(width = 1.5,color = teams.loc[school]['color']),
-            opacity = .11,
+            opacity = .2,
             #opacity = .15+ (towns['count'][i] * .01 /132),
             hoverinfo = None,
         )
@@ -165,7 +180,7 @@ fig.add_trace(go.Scattergeo(
     marker = dict(
         size = 2 + (recruits['count'] * .075),
         color = 'rgb(55, 0, 233)',
-        opacity = .2,#.2+ (recruits['count'] * .01),
+        opacity = .25,#.2+ (recruits['count'] * .01),
         line = dict(
             width = 2,
             color = 'rgba(68, 68, 68, 0)'
@@ -181,21 +196,25 @@ yearString = " - ".join(str(x) for x in years)
 if (stars[0] == 1) & (stars[1] == 5):
     starString = ''
 elif (stars[0] == 4) & (stars[1] == 5):
-    starString = 'Blue Chip '
+    starString = 'Blue Chip'
 else:
     stars = sorted(set(stars))
-    starString = f"{' - '.join(str(x) for x in stars)} Star "
+    starString = f"{' - '.join(str(x) for x in stars)} Star"
 
-
-
+ 
+titleString =  f'{starString}{positionString} {recruitString}{distanceString}'
+fontsize = 20
+if len(titleString) > 50:
+    fontsize = 15
+    
 #title and map layout
 fig.update_layout(
-    title_text = f'{starString}{positionString}{distanceString}',
+    title_text = titleString,
     title_x=0.5,
     title_y=.76,
     font=dict(
         family='Arial',
-        size=20,
+        size=fontsize,
     ),
     showlegend = False,
     geo = go.layout.Geo(
@@ -231,6 +250,10 @@ for school in schools:
     #school
     color = [teams.loc[school]['color']]
     
+    schoolString = str(available[i])
+    if connectionFilter == 'Commits Only':
+        schoolString = str(commits[i])
+    
     x = 1-((len(schools) - 1) * .112 + (.5 - (i * .224)))
     if len(schools) >= 7:
         x = 1-((len(schools) - 1) * .09 + (.5 - (i * .18)))
@@ -240,7 +263,7 @@ for school in schools:
         lon = [teams.loc[school]['lng']],
         lat = [teams.loc[school]['lat']],
         hoverinfo = 'text',
-        text =  school + ' - ' + str(available[i]),
+        text =  school + ' - ' + schoolString,
         mode = 'markers',
         marker = dict(
             size = 6,
@@ -298,6 +321,7 @@ for school in schools:
 st.write(fig)
 
 
+
 moreDetails = st.beta_expander('More Details')
 with moreDetails:
     
@@ -309,26 +333,31 @@ with moreDetails:
         school = st.selectbox("Team", schools)
 
         #user input for view
-        viewOptions = [f'How far did all {starString.lower()} {positionString.lower()} that went to {school} in {yearString} come?', f'Where did {starString.lower()} {positionString.lower()} within {distance} miles of {school} in {yearString} go to?']
+        viewOptions = [f'From how far did all {yearString} {starString.lower()} {positionString} {school}  commits come?', f'Where did {starString.lower()} {positionString} recruits within {distance} miles of {school} in {yearString} go?']
         view = st.radio('View', viewOptions, index = 0)
         
         try:
             
             if view == viewOptions[0]:
+                
+                titleString = f'{starString}{positionString} {school} Commits {yearString}'
+                
                 recruitsTable = recruitsTable[recruitsTable['committedTo'] == school]
                 
                 lat = teams.loc[school]['lat']
                 lng = teams.loc[school]['lng']
-                recruitsTable['distance'] = recruitsTable.apply(lambda row: great_circle(row['lng'], row['lat'], lng, lat), axis = 1)
+                recruitsTable['distance'] = recruitsTable.apply(lambda row: int(great_circle(row['lng'], row['lat'], lng, lat)), axis = 1)
                 
                 color = teams.loc[school]['color']
                 max = recruitsTable['distance'].max()
-                hist = px.histogram(recruitsTable, x = 'distance', marginal = 'violin', color_discrete_sequence=[color], nbins = int(max / 100), template = 'simple_white', range_x = [0, max * 1.5])
+                hist = px.histogram(recruitsTable, x = 'distance', marginal = 'violin', color_discrete_sequence=[color], nbins = int(max / 100), template = 'simple_white', range_x = [0, max * 1.25])
                 hist.update_xaxes(tick0=0)
                 st.write(hist)
                 
         
-            else:
+            elif view == viewOptions[1]:
+                titleString = f'{starString}{positionString} {school} Recruits {distanceString} {yearString}'
+                
                 recruitsTable = townsTable
                 towns = towns[towns['school'] == school]
                 cityList = towns['city'].tolist()
@@ -351,17 +380,14 @@ with moreDetails:
         
     else:
         recruitsTable = recruitsTable.reindex(columns = ['year','name','committedTo','position','stars','city'])
+        titleString = f'{starString}{positionString} Recruits {yearString}'
          
     st.write(recruitsTable)
     
-    #handle exceptions for when no teams are selected
-    st.markdown(get_table_download_link(recruits, school, starString, yearString), unsafe_allow_html=True)
+    st.markdown(get_table_download_link(recruitsTable, titleString), unsafe_allow_html=True)
 
 
-#handle no team listed exceptions
-#figure out what to do when title is too big (maybe use len() to move down font size?)
-#maybe change colors depending on commit or not 
-#fix capitalization of options filter for positions
+
 #st.markdown('___')
 st.markdown('Created by [Ben Davis](https://github.com/BenDavis71/)')
 st.markdown('Map data from [SimpleMaps](https://simplemaps.com/data/us-cities)')
