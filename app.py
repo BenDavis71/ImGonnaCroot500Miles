@@ -5,9 +5,10 @@
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-import streamlit as st
+import plotly.express as px
+import base64
 from math import radians, degrees, sin, cos, asin, acos, sqrt
-
+import streamlit as st
 
 
 
@@ -37,6 +38,18 @@ def great_circle(lon1, lat1, lon2, lat2):
     return 3958.756 * (
         acos(sin(lat1) * sin(lat2) + cos(lat1) * cos(lat2) * cos(lon1 - lon2))
     )
+    
+
+#download csv function from https://discuss.streamlit.io/t/how-to-download-file-in-streamlit/1806
+def get_table_download_link(df, school, starsString, yearString):
+    """Generates a link allowing the data in a given panda dataframe to be downloaded
+    in:  dataframe
+    out: href string
+    """
+    csv = df.to_csv(index=False)
+    b64 = base64.b64encode(csv.encode()).decode()  # some strings <-> bytes conversions necessary here
+    href = f'<a href="data:file/csv;base64,{b64}" download="{school} {starString}Recruits {yearString}.csv">Download {school} {starsString}Recruiting {yearString} as CSV</a>'
+    return href
 
 
 recruits, teams, teamsList = getData()
@@ -48,7 +61,7 @@ years = st.slider("Date Range", min_value=2010, max_value=2020, value=(2015, 202
 stars = st.slider("Stars", min_value=1, max_value=5, value=(4, 5))
 
 #user input for distance
-distance = st.slider("Distance", min_value=0, max_value=500, value=250, step=25)
+distance = st.slider("Distance in Miles", min_value=0, max_value=500, value=250, step=25)
 
 #user input for recruit type
 positionFilter = st.radio('Position Filter', ['All Recruits', 'By Position'])
@@ -73,14 +86,20 @@ if positionFilter == 'By Position':
     recruits = recruits[recruits['position'].isin(positions)]
     positionString = f"{', '.join(positions)} Recruits"
 
+#save recruits and teams df's current state for later displayTable
+recruitsTable = recruits.copy(deep = True)
+teamsTable = teams.copy(deep = True)
 
 #groupbys to reduce dataframe size
-
 teams = teams[teams['school'].isin(schools)]
 
 recruits['merge'] = 1
 teams['merge'] = 1
 towns = pd.merge(recruits,teams,on='merge')
+
+
+
+
 
 distanceString =  ''
 if len(schools) > 0:
@@ -91,6 +110,9 @@ else:
     towns = towns[:2]
     distanceString
     #convert user inputs to sets & strings (accounting for potential of single year selections)
+
+#save towns df's current state for later displayTable
+townsTable = towns.copy(deep = True)
 
 
 teams = teams.set_index('school')
@@ -275,6 +297,71 @@ for school in schools:
     
 st.write(fig)
 
-st.markdown('___')
+
+moreDetails = st.beta_expander('More Details')
+with moreDetails:
+    
+
+    #avoid errors on cases where no team is selected
+    if len(schools) > 0:
+        
+        #user input for team
+        school = st.selectbox("Team", schools)
+
+        #user input for view
+        viewOptions = [f'How far did all {starString.lower()} {positionString.lower()} that went to {school} in {yearString} come?', f'Where did {starString.lower()} {positionString.lower()} within {distance} miles of {school} in {yearString} go to?']
+        view = st.radio('View', viewOptions, index = 0)
+        
+        try:
+            
+            if view == viewOptions[0]:
+                recruitsTable = recruitsTable[recruitsTable['committedTo'] == school]
+                
+                lat = teams.loc[school]['lat']
+                lng = teams.loc[school]['lng']
+                recruitsTable['distance'] = recruitsTable.apply(lambda row: great_circle(row['lng'], row['lat'], lng, lat), axis = 1)
+                
+                color = teams.loc[school]['color']
+                max = recruitsTable['distance'].max()
+                hist = px.histogram(recruitsTable, x = 'distance', marginal = 'violin', color_discrete_sequence=[color], nbins = int(max / 100), template = 'simple_white', range_x = [0, max * 1.5])
+                hist.update_xaxes(tick0=0)
+                st.write(hist)
+                
+        
+            else:
+                recruitsTable = townsTable
+                towns = towns[towns['school'] == school]
+                cityList = towns['city'].tolist()
+                recruitsTable = recruitsTable[recruitsTable['city'].isin(cityList)]
+    
+                barTable = recruitsTable.groupby(['committedTo'], as_index=False).count()
+                barTable = pd.merge(barTable,teamsTable,left_on='committedTo', right_on='school')
+                barTable = barTable.sort_values(by='count',ascending=False).head(7)
+                bar = px.bar(barTable, x = 'committedTo', y ='count', color = 'committedTo', color_discrete_sequence=barTable['color_y'].tolist(), template = 'simple_white').update_layout(showlegend=False)
+                st.write(bar)
+              
+              
+              
+            recruitsTable['distance'] = recruitsTable['distance'].astype(int)
+            recruitsTable = recruitsTable.reindex(columns = ['year','name','committedTo','position','stars','city','distance'])
+            recruitsTable = recruitsTable.sort_values(by = ['year','stars','city','committedTo'], ascending = [True,False,True,True]).reset_index(drop = True)
+            
+        except:
+            st.write('No data available for this selection')
+        
+    else:
+        recruitsTable = recruitsTable.reindex(columns = ['year','name','committedTo','position','stars','city'])
+         
+    st.write(recruitsTable)
+    
+    #handle exceptions for when no teams are selected
+    st.markdown(get_table_download_link(recruits, school, starString, yearString), unsafe_allow_html=True)
+
+
+#handle no team listed exceptions
+#figure out what to do when title is too big (maybe use len() to move down font size?)
+#maybe change colors depending on commit or not 
+#fix capitalization of options filter for positions
+#st.markdown('___')
 st.markdown('Created by [Ben Davis](https://github.com/BenDavis71/)')
 st.markdown('Map data from [SimpleMaps](https://simplemaps.com/data/us-cities)')
