@@ -72,7 +72,7 @@ if positionFilter == 'By Position':
 
 
 #user input for mapping
-connectionFilter = st.radio('Connection Filter', [f'All Recruits Within {str(distance)} Miles', 'Commits Only'])
+connectionFilter = st.radio('Connection Filter', [f'All Recruits within {str(distance)} Miles', 'Commits Only'])
 
 
 #user input for team
