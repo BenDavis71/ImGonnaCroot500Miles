@@ -333,7 +333,7 @@ with moreDetails:
         school = st.selectbox("Team", schools)
 
         #user input for view
-        viewOptions = [f'From how far did all {yearString} {starString.lower()} {positionString} {school}  commits come?', f'Where did {starString.lower()} {positionString} recruits within {distance} miles of {school} in {yearString} go?']
+        viewOptions = [f'From how far away did all {starString.lower()} {positionString} {school}  commits come in {yearString}?', f'Where did {starString.lower()} {positionString} recruits within {distance} miles of {school} go in {yearString}?']
         view = st.radio('View', viewOptions, index = 0)
         
         try:
@@ -380,7 +380,31 @@ with moreDetails:
         
     else:
         recruitsTable = recruitsTable.reindex(columns = ['year','name','committedTo','position','stars','city'])
-        titleString = f'{starString}{positionString} Recruits {yearString}'
+        recruitsTable['state'] = recruitsTable['city'].apply(lambda x: x[-2:])
+        
+        cityList = list(set(recruitsTable['city']))
+        locationList = ['All Locations'] + sorted(list(set(recruitsTable['state']))) + sorted(list(set(recruitsTable['city'])))
+
+        #user input for locations
+        locationFilter = st.selectbox('Location', locationList)
+        
+        locationString = ''
+        if locationFilter != locationList[0]:
+            recruitsTable = recruitsTable[recruitsTable['city'] == locationFilter].append(recruitsTable[recruitsTable['state'] == locationFilter])
+            locationString = f'from {locationFilter} '
+ 
+        #user input for view
+        viewOptions = [f'Where did {starString.lower()} {positionString} recruits {locationString}in {yearString} go?']
+        view = st.radio('View', viewOptions, index = 0)
+        
+        titleString = f'{starString}{positionString} Recruits {locationString}{yearString}'
+        
+        barTable = recruitsTable.groupby(['committedTo'], as_index=False).count()
+        barTable = pd.merge(barTable,teamsTable,left_on='committedTo', right_on='school')
+        barTable['count'] = barTable['stars']
+        barTable = barTable.sort_values(by='count',ascending=False).head(7)
+        bar = px.bar(barTable, x = 'committedTo', y ='count', color = 'committedTo', color_discrete_sequence=barTable['color'].tolist(), template = 'simple_white').update_layout(showlegend=False)
+        st.write(bar)
          
     st.write(recruitsTable)
     
