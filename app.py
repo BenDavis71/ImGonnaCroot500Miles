@@ -394,7 +394,7 @@ with moreDetails:
             locationString = f'from {locationFilter} '
  
         #user input for view
-        viewOptions = [f'Where did {starString.lower()} {positionString} recruits {locationString}in {yearString} go?']
+        viewOptions = [f'Where did {starString.lower()} {positionString} recruits {locationString}go in {yearString}?']
         view = st.radio('View', viewOptions, index = 0)
         
         titleString = f'{starString}{positionString} Recruits {locationString}{yearString}'
