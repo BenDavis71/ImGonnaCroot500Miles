@@ -351,7 +351,7 @@ with moreDetails:
                 color = teams.loc[school]['color']
                 max = recruitsTable['distance'].max()
                 hist = px.histogram(recruitsTable, x = 'distance', marginal = 'violin', color_discrete_sequence=[color], nbins = int(max / 100), template = 'simple_white', range_x = [0, max * 1.25])
-                hist.update_xaxes(tick0=0)
+                hist.update_xaxes(tick0=0).update_layout(font_family='Arial', font_size = 14)
                 st.write(hist)
                 
         
@@ -366,7 +366,7 @@ with moreDetails:
                 barTable = recruitsTable.groupby(['committedTo'], as_index=False).count()
                 barTable = pd.merge(barTable,teamsTable,left_on='committedTo', right_on='school')
                 barTable = barTable.sort_values(by='count',ascending=False).head(7)
-                bar = px.bar(barTable, x = 'committedTo', y ='count', color = 'committedTo', color_discrete_sequence=barTable['color_y'].tolist(), template = 'simple_white').update_layout(showlegend=False)
+                bar = px.bar(barTable, x = 'committedTo', y ='count', color = 'committedTo', color_discrete_sequence=barTable['color_y'].tolist(), template = 'simple_white').update_layout(showlegend=False,font_family='Arial', font_size = 12)
                 st.write(bar)
               
               
@@ -403,7 +403,7 @@ with moreDetails:
         barTable = pd.merge(barTable,teamsTable,left_on='committedTo', right_on='school')
         barTable['count'] = barTable['stars']
         barTable = barTable.sort_values(by='count',ascending=False).head(7)
-        bar = px.bar(barTable, x = 'committedTo', y ='count', color = 'committedTo', color_discrete_sequence=barTable['color'].tolist(), template = 'simple_white').update_layout(showlegend=False)
+        bar = px.bar(barTable, x = 'committedTo', y ='count', color = 'committedTo', color_discrete_sequence=barTable['color'].tolist(), template = 'simple_white').update_layout(showlegend=False,font_family='Arial', font_size = 12)
         st.write(bar)
          
     st.write(recruitsTable)
