@@ -54,8 +54,11 @@ def get_table_download_link(df, titleString):
 
 recruits, teams, teamsList = getData()
 
+#find the latest year of recruiting info
+maxYear = int(recruits['year'].max())
+
 #user input for date range
-years = st.slider("Date Range", min_value=2010, max_value=2020, value=(2015, 2020))
+years = st.slider("Date Range", min_value=2010, max_value=maxYear, value=(2015, maxYear))
 
 #user input for stars
 stars = st.slider("Stars", min_value=1, max_value=5, value=(4, 5))
